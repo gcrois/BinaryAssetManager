@@ -2,7 +2,8 @@
 	"name": "binaryassetmanager",
 	"showName": "BinaryAssetManager",
 	"exports": {
-		".": "./src/index.ts"
+		".": "./src/index.ts",
+		"./AssetContext": "./src/AssetContext.tsx"
 	},
 	"type": "module",
 	"description": "A simple binary asset manager for the web",

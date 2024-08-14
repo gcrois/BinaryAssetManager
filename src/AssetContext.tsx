@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import BinaryAssetManager from "./index";
 
 // Define the shape of our context
-interface BinaryAssetContextType {
+export interface BinaryAssetContextType {
 	manager: BinaryAssetManager | null;
 	isInitialized: boolean;
 	addFile: (file: File) => Promise<void>;
