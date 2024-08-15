@@ -133,6 +133,24 @@ class BinaryAssetManager {
 
 		await zipReader.close();
 	}
+
+	async deleteFile(fileName: string): Promise<void> {
+		const transaction = this.db?.transaction(
+			[this.storeName],
+			"readwrite",
+		);
+		const store = transaction?.objectStore(this.storeName);
+		store?.delete(fileName);
+	}
+
+	async clear(): Promise<void> {
+		const transaction = this.db?.transaction(
+			[this.storeName],
+			"readwrite",
+		);
+		const store = transaction?.objectStore(this.storeName);
+		store?.clear();
+	}
 }
 
 export default BinaryAssetManager;

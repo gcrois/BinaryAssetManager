@@ -10,6 +10,8 @@ export interface BinaryAssetContextType {
 	getTotalUsage: () => Promise<number>;
 	downloadAsZip: () => Promise<Blob>;
 	uploadZip: (zipFile: File) => Promise<void>;
+	deleteFile: (fileName: string) => Promise<void>;
+	clear: () => Promise<void>;
 }
 
 // Create the context
@@ -60,6 +62,16 @@ export const BinaryAssetProvider: React.FC<React.PropsWithChildren<object>> = ({
 		await manager.uploadZip(zipFile);
 	};
 
+	const deleteFile = async (fileName: string) => {
+		if (!manager) throw new Error("Manager not initialized");
+		await manager.deleteFile(fileName);
+	}
+
+	const clear = async () => {
+		if (!manager) throw new Error("Manager not initialized");
+		await manager.clear();
+	}
+
 	return (
 		<BinaryAssetContext.Provider
 			value={{
@@ -70,6 +82,8 @@ export const BinaryAssetProvider: React.FC<React.PropsWithChildren<object>> = ({
 				getTotalUsage,
 				downloadAsZip,
 				uploadZip,
+				deleteFile,
+				clear,
 			}}
 		>
 			{children}
