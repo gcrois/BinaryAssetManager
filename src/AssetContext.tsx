@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import BinaryAssetManager from "./index";
+import BinaryAssetManager from "./src";
 
 // Define the shape of our context
 export interface BinaryAssetContextType {

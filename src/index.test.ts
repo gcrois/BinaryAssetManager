@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import BinaryAssetManager from "./index";
+import BinaryAssetManager from "./src";
 
 // Mock IndexedDB
 import "fake-indexeddb/auto";
