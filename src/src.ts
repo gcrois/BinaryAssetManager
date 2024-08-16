@@ -1,5 +1,7 @@
 import { ZipReader, ZipWriter, BlobReader, BlobWriter } from "@zip.js/zip.js";
 
+export type FileID = `file:${string}`;
+
 class BinaryAssetManager {
 	private dbName: string = "BinaryAssetManagerDB";
 	private storeName: string = "assets";
@@ -30,7 +32,7 @@ class BinaryAssetManager {
 		if (!this.db) throw new Error("Database not initialized");
 
 		return new Promise((resolve, reject) => {
-			const transaction = this.db.transaction(
+			const transaction = this.db!.transaction(
 				[this.storeName],
 				"readwrite",
 			);
@@ -50,7 +52,7 @@ class BinaryAssetManager {
 		if (!this.db) throw new Error("Database not initialized");
 
 		return new Promise((resolve, reject) => {
-			const transaction = this.db.transaction(
+			const transaction = this.db!.transaction(
 				[this.storeName],
 				"readonly",
 			);
@@ -73,7 +75,7 @@ class BinaryAssetManager {
 		if (!this.db) throw new Error("Database not initialized");
 
 		return new Promise((resolve, reject) => {
-			const transaction = this.db.transaction(
+			const transaction = this.db!.transaction(
 				[this.storeName],
 				"readonly",
 			);
@@ -123,9 +125,9 @@ class BinaryAssetManager {
 
 		for (const entry of entries) {
 			if (!entry.directory) {
-				const blob = await entry.getData(new BlobWriter());
-				const file = new File([blob], entry.filename, {
-					type: blob.type,
+				const blob = await entry?.getData?.(new BlobWriter());
+				const file = new File([blob!], entry.filename, {
+					type: blob!.type,
 				});
 				await this.addFile(file);
 			}
@@ -135,19 +137,13 @@ class BinaryAssetManager {
 	}
 
 	async deleteFile(fileName: string): Promise<void> {
-		const transaction = this.db?.transaction(
-			[this.storeName],
-			"readwrite",
-		);
+		const transaction = this.db?.transaction([this.storeName], "readwrite");
 		const store = transaction?.objectStore(this.storeName);
 		store?.delete(fileName);
 	}
 
 	async clear(): Promise<void> {
-		const transaction = this.db?.transaction(
-			[this.storeName],
-			"readwrite",
-		);
+		const transaction = this.db?.transaction([this.storeName], "readwrite");
 		const store = transaction?.objectStore(this.storeName);
 		store?.clear();
 	}

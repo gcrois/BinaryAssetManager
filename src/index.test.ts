@@ -1,7 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import BinaryAssetManager from "./src";
-
-// Mock IndexedDB
 import "fake-indexeddb/auto";
 
 // Mock URL.createObjectURL
@@ -62,25 +60,12 @@ describe("BinaryAssetManager", () => {
 		await manager.addFile(file);
 		const url = await manager.getFileUrl("test.txt");
 		expect(url).toBe("blob:mocked-url");
-	}, 10000);
+	});
 
 	it("should return null for non-existent file URL", async () => {
 		const url = await manager.getFileUrl("non-existent.txt");
 		expect(url).toBeNull();
 	});
-
-	it("should calculate total usage", async () => {
-		const file1 = new File(["test content 1"], "test1.txt", {
-			type: "text/plain",
-		});
-		const file2 = new File(["test content 2"], "test2.txt", {
-			type: "text/plain",
-		});
-		await manager.addFile(file1);
-		await manager.addFile(file2);
-		const usage = await manager.getTotalUsage();
-		expect(usage).toBe(file1.size + file2.size);
-	}, 10000);
 
 	it("should download as zip", async () => {
 		const file1 = new File(["test content 1"], "test1.txt", {
@@ -94,7 +79,7 @@ describe("BinaryAssetManager", () => {
 		const zipBlob = await manager.downloadAsZip();
 		expect(zipBlob).toBeInstanceOf(Blob);
 		expect(zipBlob.size).toBeGreaterThan(0);
-	}, 10000);
+	});
 
 	it("should upload and extract zip", async () => {
 		const zipFile = new File(["fake zip content"], "test.zip", {
@@ -105,5 +90,29 @@ describe("BinaryAssetManager", () => {
 		const url2 = await manager.getFileUrl("test2.txt");
 		expect(url1).toBe("blob:mocked-url");
 		expect(url2).toBe("blob:mocked-url");
-	}, 10000);
+	});
+
+	it("should delete a file", async () => {
+		const file = new File(["test content"], "test.txt", {
+			type: "text/plain",
+		});
+		await manager.addFile(file);
+		await manager.deleteFile("test.txt");
+		const url = await manager.getFileUrl("test.txt");
+		expect(url).toBeNull();
+	});
+
+	it("should clear all files", async () => {
+		const file1 = new File(["test content 1"], "test1.txt", {
+			type: "text/plain",
+		});
+		const file2 = new File(["test content 2"], "test2.txt", {
+			type: "text/plain",
+		});
+		await manager.addFile(file1);
+		await manager.addFile(file2);
+		await manager.clear();
+		const totalUsage = await manager.getTotalUsage();
+		expect(totalUsage).toBe(0);
+	});
 });

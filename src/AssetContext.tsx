@@ -65,12 +65,12 @@ export const BinaryAssetProvider: React.FC<React.PropsWithChildren<object>> = ({
 	const deleteFile = async (fileName: string) => {
 		if (!manager) throw new Error("Manager not initialized");
 		await manager.deleteFile(fileName);
-	}
+	};
 
 	const clear = async () => {
 		if (!manager) throw new Error("Manager not initialized");
 		await manager.clear();
-	}
+	};
 
 	return (
 		<BinaryAssetContext.Provider
