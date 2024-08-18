@@ -1,34 +1,98 @@
 import { ZipReader, ZipWriter, BlobReader, BlobWriter } from "@zip.js/zip.js";
+import { File as FileReference } from "trask/proto/definitions.ts";
+import { v4 as uuid } from "uuid";
 
 export type FileID = `file:${string}`;
 
+function createFileID(): FileID {
+	return `file:${uuid()}`;
+}
+
+export interface AssetEntry extends Omit<FileReference, "type"> {
+	id: FileID;
+	url?: string;
+	file: Blob;
+}
+
 class BinaryAssetManager {
 	private dbName: string = "BinaryAssetManagerDB";
-	private storeName: string = "assets";
+	private storeName: string = "binaryassets";
 	private db: IDBDatabase | null = null;
+	private urlCache: Map<string, string> = new Map();
 
 	constructor() {}
 
 	async initialize(): Promise<void> {
 		return new Promise((resolve, reject) => {
-			const request = indexedDB.open(this.dbName, 1);
+			const request = indexedDB.open(this.dbName, 2);
 
-			request.onerror = () =>
+			request.onerror = (ev) => {
+				console.error(ev);
 				reject(new Error("Failed to open database"));
+			};
 
 			request.onsuccess = (event) => {
 				this.db = (event.target as IDBOpenDBRequest).result;
+				console.log("Database opened", this.db);
 				resolve();
 			};
 
 			request.onupgradeneeded = (event) => {
 				const db = (event.target as IDBOpenDBRequest).result;
-				db.createObjectStore(this.storeName, { keyPath: "fileName" });
+				db.createObjectStore(this.storeName, { keyPath: "id" });
+				this.db = db;
+				console.log("Database upgraded", db);
 			};
 		});
 	}
 
-	async addFile(file: File): Promise<void> {
+	async addFile(file: File | Blob, name?: string): Promise<AssetEntry["id"]> {
+		const id = createFileID();
+		console.log("trying to add file", id);
+
+		if (!this.db) throw new Error("Database not initialized");
+
+		return new Promise((resolve, reject) => {
+			const transaction = this.db!.transaction([this.storeName], "readwrite");
+			const store = transaction.objectStore(this.storeName);
+			const item: AssetEntry = {
+				id: id,
+				name: name || (file instanceof File ? file.name : id),
+				file: file,
+				size: file.size,
+				hash: "hash", // You might want to implement proper hashing
+			};
+			console.log(item);
+			const request = store.put(item);
+	
+			request.onerror = (event) => {
+				console.error("Error adding file:", (event.target as any).error);
+				reject(new Error("Failed to add file"));
+			};
+			request.onsuccess = () => resolve(id);
+		});
+	}
+
+	async getFile(fileID: FileID): Promise<AssetEntry | null> {
+		if (!this.db) throw new Error("Database not initialized");
+
+		return new Promise((resolve, reject) => {
+			const transaction = this.db!.transaction(
+				[this.storeName],
+				"readonly",
+			);
+			const store = transaction.objectStore(this.storeName);
+			const request = store.get(fileID);
+
+			request.onerror = () => reject(new Error("Failed to get file"));
+			request.onsuccess = () => {
+				const result = request.result as AssetEntry;
+				resolve(result ?? null);
+			};
+		});
+	}
+
+	async syncFile(file: File | Blob, id: FileID): Promise<AssetEntry["id"]> {
 		if (!this.db) throw new Error("Database not initialized");
 
 		return new Promise((resolve, reject) => {
@@ -38,36 +102,39 @@ class BinaryAssetManager {
 			);
 			const store = transaction.objectStore(this.storeName);
 			const request = store.put({
-				fileName: file.name,
+				id: id,
+				name: (file as File).name ?? id,
 				file: file,
 				size: file.size,
-			});
+				hash: "hash",
+			} as AssetEntry);
 
-			request.onerror = () => reject(new Error("Failed to add file"));
-			request.onsuccess = () => resolve();
+			request.onerror = () => reject(new Error("Failed to sync file"));
+			request.onsuccess = () => resolve(id);
 		});
 	}
 
-	async getFileUrl(fileName: string): Promise<string | null> {
+	async getFileUrl(fileID: FileID): Promise<string | null> {
 		if (!this.db) throw new Error("Database not initialized");
 
-		return new Promise((resolve, reject) => {
-			const transaction = this.db!.transaction(
-				[this.storeName],
-				"readonly",
-			);
-			const store = transaction.objectStore(this.storeName);
-			const request = store.get(fileName);
+		// Check if URL is already in cache
+		if (this.urlCache.has(fileID)) {
+			return this.urlCache.get(fileID)!;
+		}
 
-			request.onerror = () => reject(new Error("Failed to get file"));
-			request.onsuccess = () => {
-				const result = request.result;
-				if (result && result.file) {
-					resolve(URL.createObjectURL(result.file));
-				} else {
-					resolve(null);
-				}
-			};
+		return new Promise((resolve, reject) => {
+			this.getFile(fileID)
+				.then((file) => {
+					if (!file) {
+						resolve(null);
+						return;
+					}
+
+					const url = URL.createObjectURL(file.file);
+					this.urlCache.set(fileID, url);
+					resolve(url);
+				})
+				.catch(reject);
 		});
 	}
 
@@ -84,7 +151,7 @@ class BinaryAssetManager {
 
 			request.onerror = () => reject(new Error("Failed to get files"));
 			request.onsuccess = () => {
-				const files = request.result;
+				const files = request.result as AssetEntry[];
 				const totalSize = files.reduce(
 					(acc, file) => acc + file.size,
 					0,
@@ -106,12 +173,9 @@ class BinaryAssetManager {
 		return new Promise((resolve, reject) => {
 			request.onerror = () => reject(new Error("Failed to get files"));
 			request.onsuccess = async () => {
-				const files = request.result;
+				const files = request.result as AssetEntry[];
 				for (const file of files) {
-					await zipWriter.add(
-						file.fileName,
-						new BlobReader(file.file),
-					);
+					await zipWriter.add(file.name, new BlobReader(file.file));
 				}
 				const zipBlob = await zipWriter.close();
 				resolve(zipBlob);
@@ -136,16 +200,29 @@ class BinaryAssetManager {
 		await zipReader.close();
 	}
 
-	async deleteFile(fileName: string): Promise<void> {
+	async deleteFile(fileId: FileID): Promise<void> {
 		const transaction = this.db?.transaction([this.storeName], "readwrite");
 		const store = transaction?.objectStore(this.storeName);
-		store?.delete(fileName);
+		store?.delete(fileId);
+
+		// Remove the URL from the cache and revoke the object URL
+		const url = this.urlCache.get(fileId);
+		if (url) {
+			URL.revokeObjectURL(url);
+			this.urlCache.delete(fileId);
+		}
 	}
 
 	async clear(): Promise<void> {
 		const transaction = this.db?.transaction([this.storeName], "readwrite");
 		const store = transaction?.objectStore(this.storeName);
 		store?.clear();
+
+		// Revoke all object URLs and clear the cache
+		for (const url of this.urlCache.values()) {
+			URL.revokeObjectURL(url);
+		}
+		this.urlCache.clear();
 	}
 }
 

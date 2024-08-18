@@ -1,16 +1,18 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import BinaryAssetManager from "./src";
+import BinaryAssetManager, { FileID } from "./src";
+import { AssetEntry } from "./src";
 
 // Define the shape of our context
 export interface BinaryAssetContextType {
 	manager: BinaryAssetManager | null;
 	isInitialized: boolean;
-	addFile: (file: File) => Promise<void>;
-	getFileUrl: (fileName: string) => Promise<string | null>;
+	addFile: (file: File) => Promise<FileID>;
+	getFile: (fileId: FileID) => Promise<AssetEntry | null>;
+	getFileUrl: (fileId: FileID) => Promise<string | null>;
 	getTotalUsage: () => Promise<number>;
 	downloadAsZip: () => Promise<Blob>;
 	uploadZip: (zipFile: File) => Promise<void>;
-	deleteFile: (fileName: string) => Promise<void>;
+	deleteFile: (fileId: FileID) => Promise<void>;
 	clear: () => Promise<void>;
 }
 
@@ -30,6 +32,7 @@ export const BinaryAssetProvider: React.FC<React.PropsWithChildren<object>> = ({
 		const initManager = async () => {
 			const newManager = new BinaryAssetManager();
 			await newManager.initialize();
+			console.log("BinaryAssetManager initialized");
 			setManager(newManager);
 			setIsInitialized(true);
 		};
@@ -39,12 +42,17 @@ export const BinaryAssetProvider: React.FC<React.PropsWithChildren<object>> = ({
 
 	const addFile = async (file: File) => {
 		if (!manager) throw new Error("Manager not initialized");
-		await manager.addFile(file);
+		return await manager.addFile(file);
 	};
 
-	const getFileUrl = async (fileName: string) => {
+	const getFile = async (fileId: FileID) => {
 		if (!manager) throw new Error("Manager not initialized");
-		return await manager.getFileUrl(fileName);
+		return await manager.getFile(fileId);
+	}
+
+	const getFileUrl = async (fileId: FileID) => {
+		if (!manager) throw new Error("Manager not initialized");
+		return await manager.getFileUrl(fileId);
 	};
 
 	const getTotalUsage = async () => {
@@ -62,9 +70,9 @@ export const BinaryAssetProvider: React.FC<React.PropsWithChildren<object>> = ({
 		await manager.uploadZip(zipFile);
 	};
 
-	const deleteFile = async (fileName: string) => {
+	const deleteFile = async (fileId: FileID) => {
 		if (!manager) throw new Error("Manager not initialized");
-		await manager.deleteFile(fileName);
+		await manager.deleteFile(fileId);
 	};
 
 	const clear = async () => {
@@ -80,6 +88,7 @@ export const BinaryAssetProvider: React.FC<React.PropsWithChildren<object>> = ({
 				addFile,
 				getFileUrl,
 				getTotalUsage,
+				getFile,
 				downloadAsZip,
 				uploadZip,
 				deleteFile,
