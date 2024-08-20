@@ -2,10 +2,10 @@ import { ZipReader, ZipWriter, BlobReader, BlobWriter } from "@zip.js/zip.js";
 import { File as FileReference } from "trask/proto/definitions.ts";
 import { v4 as uuid } from "uuid";
 
-export type FileID = `file:${string}`;
+export type FileID = `asset:${string}`;
 
 function createFileID(): FileID {
-	return `file:${uuid()}`;
+	return `asset:${uuid()}`;
 }
 
 export interface AssetEntry extends Omit<FileReference, "type"> {
