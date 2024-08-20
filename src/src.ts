@@ -79,6 +79,22 @@ class BinaryAssetManager {
 		});
 	}
 
+	async addAssetEntry(entry: AssetEntry): Promise<AssetEntry["id"]> {
+		if (!this.db) throw new Error("Database not initialized");
+
+		return new Promise((resolve, reject) => {
+			const transaction = this.db!.transaction(
+				[this.storeName],
+				"readwrite",
+			);
+			const store = transaction.objectStore(this.storeName);
+			const request = store.put(entry);
+
+			request.onerror = () => reject(new Error("Failed to add file"));
+			request.onsuccess = () => resolve(entry.id);
+		});
+	}
+
 	async getFile(fileID: FileID): Promise<AssetEntry | null> {
 		if (!this.db) throw new Error("Database not initialized");
 
@@ -170,53 +186,59 @@ class BinaryAssetManager {
 	async downloadAsZip(): Promise<Blob> {
 		console.log("downloading as zip");
 		if (!this.db) throw new Error("Database not initialized");
-	
+
 		const zipWriter = new ZipWriter(new BlobWriter("application/zip"));
-	
+
 		const transaction = this.db.transaction([this.storeName], "readonly");
 		const store = transaction.objectStore(this.storeName);
 		const request = store.getAll();
-	
+
 		return new Promise((resolve, reject) => {
-		  request.onerror = () => reject(new Error("Failed to get files"));
-		  request.onsuccess = async () => {
-			const files = request.result as AssetEntry[];
-			const usedNames = new Set<string>();
-	
-			for (const file of files) {
-			  let uniqueName = file.name;
-			  let counter = 1;
-	
-			  // If the name already exists, add a counter to make it unique
-			  while (usedNames.has(uniqueName)) {
-				const nameParts = file.name.split('.');
-				if (nameParts.length > 1) {
-				  // For files with extensions
-				  const ext = nameParts.pop();
-				  uniqueName = `${nameParts.join('.')}_${counter}.${ext}`;
-				} else {
-				  // For files without extensions
-				  uniqueName = `${file.name}_${counter}`;
+			request.onerror = () => reject(new Error("Failed to get files"));
+			request.onsuccess = async () => {
+				const files = request.result as AssetEntry[];
+				const usedNames = new Set<string>();
+
+				for (const file of files) {
+					let uniqueName = file.name;
+					let counter = 1;
+
+					// If the name already exists, add a counter to make it unique
+					while (usedNames.has(uniqueName)) {
+						const nameParts = file.name.split(".");
+						if (nameParts.length > 1) {
+							// For files with extensions
+							const ext = nameParts.pop();
+							uniqueName = `${nameParts.join(".")}_${counter}.${ext}`;
+						} else {
+							// For files without extensions
+							uniqueName = `${file.name}_${counter}`;
+						}
+						counter++;
+					}
+
+					usedNames.add(uniqueName);
+
+					try {
+						await zipWriter.add(
+							uniqueName,
+							new BlobReader(file.file),
+						);
+					} catch (error) {
+						console.error(
+							`Failed to add file ${uniqueName} to zip:`,
+							error,
+						);
+						// Optionally, you can choose to continue with other files instead of rejecting
+						// reject(error);
+					}
 				}
-				counter++;
-			  }
-	
-			  usedNames.add(uniqueName);
-	
-			  try {
-				await zipWriter.add(uniqueName, new BlobReader(file.file));
-			  } catch (error) {
-				console.error(`Failed to add file ${uniqueName} to zip:`, error);
-				// Optionally, you can choose to continue with other files instead of rejecting
-				// reject(error);
-			  }
-			}
-	
-			const zipBlob = await zipWriter.close();
-			resolve(zipBlob);
-		  };
+
+				const zipBlob = await zipWriter.close();
+				resolve(zipBlob);
+			};
 		});
-	  }
+	}
 
 	async uploadZip(zipFile: File): Promise<void> {
 		const zipReader = new ZipReader(new BlobReader(zipFile));

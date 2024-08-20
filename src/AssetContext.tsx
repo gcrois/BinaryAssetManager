@@ -6,8 +6,9 @@ import { AssetEntry } from "./src";
 export interface BinaryAssetContextType {
 	manager: BinaryAssetManager | null;
 	isInitialized: boolean;
-	addFile: (file: File) => Promise<FileID>;
+	addFile: (file: File | Blob) => Promise<FileID>;
 	getFile: (fileId: FileID) => Promise<AssetEntry | null>;
+	addAssetEntry: (asset: AssetEntry) => Promise<FileID>;
 	getFileUrl: (fileId: FileID) => Promise<string | null>;
 	getTotalUsage: () => Promise<number>;
 	downloadAsZip: () => Promise<Blob>;
@@ -40,10 +41,15 @@ export const BinaryAssetProvider: React.FC<React.PropsWithChildren<object>> = ({
 		initManager();
 	}, []);
 
-	const addFile = async (file: File) => {
+	const addFile = async (file: File | Blob) => {
 		if (!manager) throw new Error("Manager not initialized");
 		return await manager.addFile(file);
 	};
+
+	const addAssetEntry = async (asset: AssetEntry) => {
+		if (!manager) throw new Error("Manager not initialized");
+		return await manager.addAssetEntry(asset);
+	}
 
 	const getFile = async (fileId: FileID) => {
 		if (!manager) throw new Error("Manager not initialized");
@@ -86,6 +92,7 @@ export const BinaryAssetProvider: React.FC<React.PropsWithChildren<object>> = ({
 				manager,
 				isInitialized,
 				addFile,
+				addAssetEntry,
 				getFileUrl,
 				getTotalUsage,
 				getFile,
