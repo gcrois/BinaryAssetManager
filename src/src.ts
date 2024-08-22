@@ -205,7 +205,7 @@ class BinaryAssetManager {
 
 					// If the name already exists, add a counter to make it unique
 					while (usedNames.has(uniqueName)) {
-						const nameParts = file.name.split(".");
+						const nameParts = (file.name || "unnamed").split(".");
 						if (nameParts.length > 1) {
 							// For files with extensions
 							const ext = nameParts.pop();
