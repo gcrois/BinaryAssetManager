@@ -2,10 +2,10 @@ import { ZipReader, ZipWriter, BlobReader, BlobWriter } from "@zip.js/zip.js";
 import { File as FileReference } from "trask/proto/definitions.ts";
 import { v4 as uuid } from "uuid";
 
-export type FileID = `asset:${string}`;
+export type FileID = `asset-${string}`;
 
 function createFileID(): FileID {
-	return `asset:${uuid()}`;
+	return `asset-${uuid()}`;
 }
 
 export interface AssetEntry extends Omit<FileReference, "type"> {
@@ -60,7 +60,7 @@ class BinaryAssetManager {
 			const store = transaction.objectStore(this.storeName);
 			const item: AssetEntry = {
 				id: id,
-				name: name || (file instanceof File ? file.name : id),
+				name: name ?? id,//,(file instanceof File ? file.name : id),
 				file: file,
 				size: file.size,
 				hash: "hash", // You might want to implement proper hashing
@@ -136,30 +136,38 @@ class BinaryAssetManager {
 		});
 	}
 
-	async getFileUrl(fileID: FileID): Promise<string | null> {
-		if (!this.db) throw new Error("Database not initialized");
+    async getFileUrl(fileID: FileID): Promise<string | null> {
+        if (!this.db) throw new Error("Database not initialized");
 
-		// Check if URL is already in cache
-		if (this.urlCache.has(fileID)) {
-			return this.urlCache.get(fileID)!;
-		}
+        // Check if URL is already in cache
+        if (this.urlCache.has(fileID)) {
+            return this.urlCache.get(fileID)!;
+        }
 
-		return new Promise((resolve, reject) => {
-			this.getFile(fileID)
-				.then((file) => {
-					if (!file) {
-						resolve(null);
-						return;
-					}
+        const maxRetries = 10; // 1 second / 100ms = 10 attempts
+        const retryDelay = 100; // 100ms
 
-					const url = URL.createObjectURL(file.file);
-					this.urlCache.set(fileID, url);
-					resolve(url);
-				})
-				.catch(reject);
-		});
-	}
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+            try {
+                const file = await this.getFile(fileID);
+                if (file) {
+                    const url = URL.createObjectURL(file.file);
+                    this.urlCache.set(fileID, url);
+                    return url;
+                }
+            } catch (error) {
+                console.warn(`Attempt ${attempt + 1} failed:`, error);
+            }
 
+            if (attempt < maxRetries - 1) {
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
+            }
+        }
+
+        console.error(`Failed to get file URL for ${fileID} after ${maxRetries} attempts`);
+        return null;
+    }
+	
 	async getTotalUsage(): Promise<number> {
 		if (!this.db) throw new Error("Database not initialized");
 
@@ -192,6 +200,12 @@ class BinaryAssetManager {
 		const transaction = this.db.transaction([this.storeName], "readonly");
 		const store = transaction.objectStore(this.storeName);
 		const request = store.getAll();
+
+		// console log all the files
+		request.onsuccess = () => {
+			const files = request.result as AssetEntry[];
+			console.log("files", files);
+		};
 
 		return new Promise((resolve, reject) => {
 			request.onerror = () => reject(new Error("Failed to get files"));

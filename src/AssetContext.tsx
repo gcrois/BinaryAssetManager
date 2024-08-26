@@ -49,7 +49,7 @@ export const BinaryAssetProvider: React.FC<React.PropsWithChildren<object>> = ({
 	const addAssetEntry = async (asset: AssetEntry) => {
 		if (!manager) throw new Error("Manager not initialized");
 		return await manager.addAssetEntry(asset);
-	}
+	};
 
 	const getFile = async (fileId: FileID) => {
 		if (!manager) throw new Error("Manager not initialized");
